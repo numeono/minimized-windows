@@ -2,9 +2,19 @@
 
 A lightweight macOS menubar app that lists all your minimized windows and lets you restore them with a single click.
 
+Useful if you keep your Dock hidden or [**have your Dock disabled**](https://github.com/numeono/macOS#disable-the-dock).
+
+<p align="center">
+  <img src="assets/app-icon.png" alt="Minimized Windows app icon" width="160">
+</p>
+
 ![macOS](https://img.shields.io/badge/macOS-12.0%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+## Screenshot
+
+![Minimized Windows menu showing minimized windows from several apps](assets/minimized-windows-menu.jpg)
 
 ## Features
 
