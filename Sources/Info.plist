@@ -9,9 +9,9 @@
     <key>CFBundleDisplayName</key>
     <string>Minimized Windows</string>
     <key>CFBundleVersion</key>
-    <string>6</string>
+    <string>7</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.5</string>
+    <string>1.6</string>
     <key>CFBundleExecutable</key>
     <string>MinimizedWindows</string>
     <key>CFBundlePackageType</key>

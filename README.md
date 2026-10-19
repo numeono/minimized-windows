@@ -14,7 +14,7 @@ Useful if you keep your Dock hidden or [**have your Dock disabled**](https://git
 
 ## Original icon interface
 
-The screenshot below shows the original icon interface. The app hides the icon when the gesture is available.
+The screenshot below shows the historical icon interface. The current app has no menu-bar icon.
 
 ![Minimized Windows menu showing minimized windows from several apps](assets/minimized-windows-menu.jpg)
 
@@ -27,9 +27,9 @@ The dropdown is 360 points wide and centered on the display where you right-clic
 
 Ordinary left-clicks and drags pass through unchanged. Drag activation and double-click activation are not enabled. With an automatically hidden menu bar, reveal the bar first. The app registers itself to launch at login.
 
-## Accessibility and fallback
+## Accessibility setup
 
-Allow Accessibility access when prompted. Until access is available, or if the event tap cannot start, the original menu-bar icon remains available. The app retries every two seconds and removes the icon when the gesture becomes available. If access is revoked, the icon returns.
+Without Accessibility access, the app shows a setup window with Open Accessibility Settings and Quit buttons. Enable Minimized Windows in System Settings. The app checks every two seconds and closes the setup window once menu-bar access works. If permission is revoked, the setup window returns. No menu-bar icon is added.
 
 ## Requirements
 
@@ -48,7 +48,7 @@ mv "build/Minimized Windows.app" /Applications/
 open "/Applications/Minimized Windows.app"
 ```
 
-Then grant Accessibility permission when prompted, or go to:  
+The setup window links to:
 **System Settings → Privacy & Security → Accessibility → add "Minimized Windows"**
 
 ### Requirements for building
@@ -77,7 +77,7 @@ Check these cases when testing a new build:
 - Cancel with Escape and by clicking outside the menu. Neither should restore a window.
 - Test the empty list, ordinary desktop clicks, and right-clicks. Check that left-clicks and drags on app menus and status icons retain their normal behavior and do not open the window list.
 - Test each connected display, including one above or to the left of the main display, and a revealed auto-hidden menu bar.
-- Revoke and restore Accessibility access. The fallback icon should appear and then disappear without restarting the app.
+- Revoke and restore Accessibility access. The setup window should appear and then disappear without restarting the app.
 
 ## License
 
