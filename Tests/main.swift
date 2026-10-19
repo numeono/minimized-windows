@@ -64,3 +64,23 @@ RunLoop.main.add(cancelTimer, forMode: .common)
 RunLoop.main.add(cancelTimer, forMode: .eventTracking)
 picker.show(windows: [fixture], on: screen, at: click) { _ in fatalError("Cancellation selected a window") }
 print("PASS: native menu tracking/action/cancellation, icons, separators, prefix titles, cursor-centered anchor, right-click opening, left-button passthrough, empty list, full-height boundaries")
+
+// Catch the unlaid-out NSAlert template that previously exposed blank controls.
+func descendants(_ view: NSView) -> [NSView] {
+    [view] + view.subviews.flatMap(descendants)
+}
+for trusted in [false, true] {
+    let alert = makeAccessSetupAlert(trusted: trusted)
+    assert(alert.buttons.map(\.title) == ["Open Accessibility Settings", "Quit"])
+    let content = alert.window.contentView!
+    let visibleButtons = descendants(content).compactMap { $0 as? NSButton }
+        .filter { !$0.isHiddenOrHasHiddenAncestor }
+    assert(visibleButtons.count == 2, "Only Settings and Quit should be visible")
+    assert(visibleButtons.allSatisfy { !$0.title.isEmpty })
+    let info = descendants(content).compactMap { $0 as? NSTextField }
+        .first { $0.stringValue == alert.informativeText }!
+    let requiredHeight = info.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: info.bounds.width, height: 1000)).height
+    assert(info.bounds.height >= requiredHeight - 1, "The complete instructions must fit")
+
+}
+print("PASS: setup alert has two visible buttons, no placeholder controls, and full instruction text")

@@ -50,15 +50,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let trusted = AXIsProcessTrusted()
         guard accessAlert == nil || alertHasAccessibility != trusted else { return }
         accessAlert?.window.orderOut(nil)
-        let alert = NSAlert()
-        alert.messageText = trusted ? "Menu-bar access could not start" : "Allow Accessibility access"
-        alert.informativeText = trusted
-            ? "Minimized Windows cannot listen for menu-bar clicks yet. It will keep retrying. If this continues, quit and reopen the app."
-            : "Open System Settings → Privacy & Security → Accessibility and enable Minimized Windows. If it is missing, use the + button to add this app. This window closes automatically when access is ready."
-        let settings = alert.addButton(withTitle: "Open Accessibility Settings")
+        let alert = makeAccessSetupAlert(trusted: trusted)
+        let settings = alert.buttons[0]
         settings.target = self
         settings.action = #selector(openAccessibilitySettings)
-        let quit = alert.addButton(withTitle: "Quit")
+        let quit = alert.buttons[1]
         quit.target = NSApp
         quit.action = #selector(NSApplication.terminate(_:))
         accessAlert = alert
@@ -187,4 +183,20 @@ func getMinimizedWindows() -> [WindowInfo] {
         ))
     }
     return result.sorted { $0.minimizedAt > $1.minimizedAt }
+}
+
+/// NSAlert normally lays out during modal presentation. This setup window is
+/// modeless so it can close when permission changes, so layout must be explicit.
+func makeAccessSetupAlert(trusted: Bool) -> NSAlert {
+    let alert = NSAlert()
+    alert.messageText = trusted ? "Menu-bar access could not start" : "Allow Accessibility access"
+    alert.informativeText = trusted
+        ? "Minimized Windows cannot listen for menu-bar clicks yet. It will keep retrying. If this continues, quit and reopen the app."
+        : "Open System Settings → Privacy & Security → Accessibility and enable Minimized Windows. If it is missing, use the + button to add this app. This window closes automatically when access is ready."
+    alert.showsHelp = false
+    alert.showsSuppressionButton = false
+    alert.addButton(withTitle: "Open Accessibility Settings")
+    alert.addButton(withTitle: "Quit")
+    alert.layout()
+    return alert
 }
