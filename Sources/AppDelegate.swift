@@ -63,24 +63,78 @@ var minimizeTimestamps: [CGWindowID: Date] = [:]
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem!
+    private var statusItem: NSStatusItem?
+    private let gesture = MenuBarGesture()
+    private let windowPicker = WindowPicker()
     private var menu: NSMenu!
     private var pollTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            button.image = makeDiamondIcon(size: 18)
-        }
         menu = NSMenu()
         menu.delegate = self
-        statusItem.menu = menu
+        gesture.onEvent = { [weak self] type, point in
+            self?.handleGesture(type, at: point)
+        }
+        gesture.containsPicker = { [weak self] point in
+            guard let primary = NSScreen.screens.first else { return false }
+            return self?.windowPicker.contains(NSPoint(x: point.x, y: primary.frame.maxY - point.y)) == true
+        }
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+        updateGestureAvailability()
 
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.recordNewlyMinimized()
+            self?.updateGestureAvailability()
         }
         recordNewlyMinimized()
         registerLoginItem()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        gesture.stop()
+        windowPicker.dismiss()
+        pollTimer?.invalidate()
+    }
+
+    private func updateGestureAvailability() {
+        if !AXIsProcessTrusted() {
+            gesture.stop()
+            windowPicker.dismiss()
+        }
+        if gesture.start() {
+            if let item = statusItem { NSStatusBar.system.removeStatusItem(item) }
+            statusItem = nil
+        } else if statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.image = makeDiamondIcon(size: 18)
+            item.button?.toolTip = "Enable Accessibility for the menu-bar gesture"
+            item.menu = menu
+            statusItem = item
+        }
+    }
+
+    private func handleGesture(_ type: CGEventType, at point: CGPoint) {
+        guard let primary = NSScreen.screens.first else { return }
+        let location = NSPoint(x: point.x, y: primary.frame.maxY - point.y)
+        switch type {
+        case .leftMouseDown, .rightMouseDown:
+            guard let screen = NSScreen.screens.first(where: {
+                location.x >= $0.frame.minX && location.x < $0.frame.maxX &&
+                location.y >= $0.frame.minY && location.y <= $0.frame.maxY
+            }) else { return }
+            recordNewlyMinimized()
+            windowPicker.show(windows: getMinimizedWindows(), on: screen) { [weak self] info in
+                self?.restoreWindow(info)
+            }
+        case .leftMouseDragged:
+            windowPicker.highlight(at: location)
+        case .leftMouseUp:
+            windowPicker.release(at: location)
+        case .keyDown:
+            windowPicker.dismiss()
+        default: break
+        }
     }
 
     private func recordNewlyMinimized() {
@@ -106,7 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
         } else {
             for info in windows {
-                let item = NSMenuItem(title: info.title, action: #selector(unminimizeWindow(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: shortenedWindowTitle(info.title), action: #selector(unminimizeWindow(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = info
                 if let icon = info.appIcon {
@@ -121,7 +175,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func unminimizeWindow(_ sender: NSMenuItem) {
         guard let info = sender.representedObject as? WindowInfo else { return }
-        AXUIElementSetAttributeValue(info.axWindow, kAXMinimizedAttribute as CFString, false as CFTypeRef)
+        restoreWindow(info)
+    }
+
+    private func restoreWindow(_ info: WindowInfo) {
+        guard AXUIElementSetAttributeValue(info.axWindow, kAXMinimizedAttribute as CFString, false as CFTypeRef) == .success else { return }
+        AXUIElementPerformAction(info.axWindow, kAXRaiseAction as CFString)
         minimizeTimestamps.removeValue(forKey: info.cgWindowID)
         NSRunningApplication(processIdentifier: info.pid)?.activate()
     }

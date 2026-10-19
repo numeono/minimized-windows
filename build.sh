@@ -13,6 +13,8 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 swiftc \
     "$SCRIPT_DIR/Sources/AppDelegate.swift" \
+    "$SCRIPT_DIR/Sources/MenuBarGesture.swift" \
+    "$SCRIPT_DIR/Sources/WindowPicker.swift" \
     "$SCRIPT_DIR/Sources/main.swift" \
     -import-objc-header "$SCRIPT_DIR/Sources/BridgingHeader.h" \
     -o "$APP_BUNDLE/Contents/MacOS/$APP_NAME" \
