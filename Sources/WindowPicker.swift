@@ -38,6 +38,9 @@ final class WindowPicker: NSObject {
             let icon = (window.appIcon ?? NSImage(named: NSImage.applicationIconName))?.copy() as? NSImage
             icon?.size = NSSize(width: 16, height: 16)
             item.image = icon
+            if #available(macOS 27.0, *) {
+                item.preferredImageVisibility = .visible
+            }
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -51,7 +54,11 @@ final class WindowPicker: NSObject {
         // Center beneath the click, but keep the menu on the clicked display.
         let x = min(max(point.x - size.width / 2, screen.frame.minX + 4),
                     max(screen.frame.minX + 4, screen.frame.maxX - size.width - 4))
-        return NSPoint(x: x, y: point.y - 4)
+        // popUp positions the content frame, not the outside of the glass.
+        // Leave room for the native menu's top inset so its border is below
+        // the menu bar immediately, even when the click is at the screen edge.
+        let contentTop = screen.frame.maxY - menuBarHeight(screen) - 8
+        return NSPoint(x: x, y: min(point.y - 4, contentTop))
     }
 
     @objc private func chooseWindow(_ sender: NSMenuItem) {

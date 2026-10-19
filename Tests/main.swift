@@ -19,7 +19,16 @@ assert(menu.size.width >= 360)
 let click = NSPoint(x: screen.frame.midX + 50, y: screen.frame.maxY - 10)
 let origin = picker.menuOrigin(size: menu.size, screen: screen, point: click)
 assert(abs(origin.x + menu.size.width / 2 - click.x) < 0.1)
-assert(abs(origin.y - (click.y - 4)) < 0.1)
+let barBottom = screen.frame.maxY - menuBarHeight(screen)
+assert(abs(origin.y - (barBottom - 8)) < 0.1)
+for clickY in [screen.frame.maxY, screen.frame.maxY - 1, barBottom + 1] {
+    let anchor = picker.menuOrigin(size: menu.size, screen: screen,
+                                  point: NSPoint(x: click.x, y: clickY))
+    assert(anchor.y == barBottom - 8, "All menu-bar click heights must open below the bar")
+}
+if #available(macOS 27.0, *) {
+    assert(menu.items[0].preferredImageVisibility == .visible)
+}
 let left = picker.menuOrigin(size: menu.size, screen: screen, point: NSPoint(x: screen.frame.minX, y: click.y))
 let right = picker.menuOrigin(size: menu.size, screen: screen, point: NSPoint(x: screen.frame.maxX, y: click.y))
 assert(left.x >= screen.frame.minX)
@@ -51,6 +60,16 @@ var selected: [CGWindowID] = []
 var timerFired = false
 let timer = Timer(timeInterval: 0.1, repeats: false) { _ in
     timerFired = true
+    let visibleWindows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+    let ownBounds = visibleWindows.filter {
+        ($0[kCGWindowOwnerPID as String] as? Int) == Int(getpid())
+    }.compactMap { $0[kCGWindowBounds as String] as? [String: CGFloat] }
+    let displayedMenu = ownBounds.first { ($0["Width"] ?? 0) >= menu.minimumWidth }!
+    let barBottomInQuartz = NSScreen.screens.first!.frame.maxY - screen.frame.maxY + menuBarHeight(screen)
+    assert(displayedMenu["Y"]! >= barBottomInQuartz,
+           "The native menu must start below the menu bar without pointer movement")
+    assert(abs(displayedMenu["X"]! + displayedMenu["Width"]! / 2 - click.x) <= 1,
+           "The actual menu frame must remain horizontally centered on the click")
     picker.menu?.performActionForItem(at: 0)
     picker.dismiss()
 }
@@ -63,7 +82,7 @@ let cancelTimer = Timer(timeInterval: 0.1, repeats: false) { _ in picker.dismiss
 RunLoop.main.add(cancelTimer, forMode: .common)
 RunLoop.main.add(cancelTimer, forMode: .eventTracking)
 picker.show(windows: [fixture], on: screen, at: click) { _ in fatalError("Cancellation selected a window") }
-print("PASS: native menu tracking/action/cancellation, icons, separators, prefix titles, cursor-centered anchor, right-click opening, left-button passthrough, empty list, full-height boundaries")
+print("PASS: native menu tracking/action/cancellation, icons, separators, prefix titles, initial native frame below menu bar, cursor-centered anchor, explicit icon visibility, right-click opening, left-button passthrough, empty list, full-height boundaries")
 
 // Catch the unlaid-out NSAlert template that previously exposed blank controls.
 func descendants(_ view: NSView) -> [NSView] {
