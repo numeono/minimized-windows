@@ -9,9 +9,9 @@
     <key>CFBundleDisplayName</key>
     <string>Minimized Windows</string>
     <key>CFBundleVersion</key>
-    <string>5</string>
+    <string>6</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.4</string>
+    <string>1.5</string>
     <key>CFBundleExecutable</key>
     <string>MinimizedWindows</string>
     <key>CFBundlePackageType</key>
@@ -23,7 +23,7 @@
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>Required to detect and restore minimized windows and open their menu by dragging down from or right-clicking the menu bar.</string>
+    <string>Required to detect and restore minimized windows and open their menu by right-clicking the menu bar.</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
 </dict>

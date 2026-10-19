@@ -1,6 +1,6 @@
 # Minimized Windows
 
-A lightweight macOS app that lists your minimized windows. Hold the primary mouse button anywhere on the menu bar and drag down to open the list. Release over a window to restore it. Or right-click the menu bar once, then click a window in the list.
+A lightweight macOS app that lists your minimized windows. Right-click the menu bar once, then click a window in the list to restore it.
 
 Useful if you keep your Dock hidden or [**have your Dock disabled**](https://github.com/numeono/macOS#disable-the-dock).
 
@@ -21,16 +21,11 @@ The screenshot below shows the original icon interface. The app hides the icon w
 ## Controls
 
 - Right-click the menu bar once to leave the list open, then click a window. Click outside the dropdown or press Escape to dismiss it.
-- Hold the primary mouse button anywhere on the visible menu bar, including over app menus, status icons, and the camera gap.
-- Drag down at least 8 points to open the window list. Keep holding, move onto a window, and release to restore it.
-- Release outside the dropdown or press Escape to cancel.
 - Choose Quit in the dropdown to stop the app.
 
-The dropdown is 360 points wide and centered on the display where the drag starts, directly below its menu bar. Titles show their first 41 characters followed by an ellipsis when needed. Text that exceeds the row width is also truncated at the end. Each window row has an app icon. Recently minimized windows appear first.
+The dropdown is 360 points wide and centered on the display where you right-click, directly below its menu bar. Titles show their first 41 characters followed by an ellipsis when needed. Text that exceeds the row width is also truncated at the end. Each window row has an app icon. Recently minimized windows appear first.
 
-A plain left-click does not open the window list. The app holds the initial menu-bar press while it checks for a drag. If you release without dragging down 8 points, it forwards the click to the original menu-bar control. This means ordinary menu-bar clicks take effect on release. Downward dragging from native menus or status icons now opens this app's list instead of their usual drag interaction.
-
-Double-click activation is not enabled. With an automatically hidden menu bar, reveal the bar first. The app registers itself to launch at login.
+Ordinary left-clicks and drags pass through unchanged. Drag activation and double-click activation are not enabled. With an automatically hidden menu bar, reveal the bar first. The app registers itself to launch at login.
 
 ## Accessibility and fallback
 
@@ -63,7 +58,7 @@ Then grant Accessibility permission when prompted, or go to:
 
 ## Why Accessibility permission?
 
-macOS requires Accessibility access for any app that reads window state from other applications. This app uses it to detect and restore minimized windows, track primary-button drags and secondary clicks on the menu bar, and forward ordinary left-clicks.
+macOS requires Accessibility access for any app that reads window state from other applications. This app uses it to detect and restore minimized windows, detect secondary clicks on the menu bar.
 
 ## How it works
 
@@ -71,16 +66,16 @@ The app uses the macOS Accessibility API (`AXMinimizedWindows` attribute) to que
 
 ## Verification
 
-The app builds locally and passes code-signature verification. Native fixture tests verify persistent right-click opening, subsequent click selection, outside-click dismissal, the downward-drag threshold, ordinary-click forwarding decisions, release selection, dropdown position, cancellation, empty-list behavior, title limits, and menu-bar boundary geometry. The dropdown was also rendered and inspected for its icon and shortened title. Live event interception and restoration still need testing in a logged-in macOS session with Accessibility access for this build, including on a notched MacBook.
+The app builds locally and passes code-signature verification. Native fixture tests verify persistent right-click opening, subsequent click selection, outside-click dismissal, ordinary left-click and drag passthrough, release selection, dropdown position, cancellation, empty-list behavior, title limits, and menu-bar boundary geometry. The dropdown was also rendered and inspected for its icon and shortened title. Live event interception and restoration still need testing in a logged-in macOS session with Accessibility access for this build, including on a notched MacBook.
 
 Run the fixture tests with `bash Tests/run.sh`. They briefly display a test dropdown and save a preview to `/tmp/minimized-windows-picker.png`.
 
 Check these cases when testing a new build:
 
-- Minimize two windows, hold the primary button on the menu bar, drag down to each entry, and release. Only the chosen window should restore and activate.
+- Minimize two windows, right-click the menu bar, then click each entry in turn. Only the chosen window should restore and activate.
 - Right-click once and release. The list should stay open until you choose a window, click outside, or press Escape.
-- Cancel with Escape and by releasing outside the menu. Neither should restore a window.
-- Test the empty list, ordinary desktop clicks, and right-clicks. Check that plain clicks on app menus and status icons still open them after release, and that dragging down from those same controls opens the window list.
+- Cancel with Escape and by clicking outside the menu. Neither should restore a window.
+- Test the empty list, ordinary desktop clicks, and right-clicks. Check that left-clicks and drags on app menus and status icons retain their normal behavior and do not open the window list.
 - Test each connected display, including one above or to the left of the main display, and a revealed auto-hidden menu bar.
 - Revoke and restore Accessibility access. The fallback icon should appear and then disappear without restarting the app.
 

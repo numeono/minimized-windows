@@ -1,12 +1,12 @@
 import Cocoa
 
-/// Shared state machine for menu-bar dragging and a persistent right-click list.
-struct MenuBarDrag {
+/// Opens a persistent list on right-click; ordinary left-button input passes through.
+struct MenuBarInteraction {
     enum Action: Equatable {
-        case pass, consume, replayClick, open(CGPoint), openPinned, update, hover, select, cancel, cancelAndPass
+        case pass, consume, openPinned, update, hover, select, cancel, cancelAndPass
     }
     private enum State {
-        case idle, pending(CGPoint), active, rightOpening, latched
+        case idle, rightOpening, latched
         case clicking(CGEventType), cancelled(CGEventType)
     }
     private var state: State = .idle
@@ -19,7 +19,6 @@ struct MenuBarDrag {
         if type == .keyDown {
             guard escape else { return .pass }
             switch state {
-            case .pending, .active: state = .cancelled(.leftMouseUp)
             case .rightOpening: state = .cancelled(.rightMouseUp)
             case .clicking(let up): state = .cancelled(up)
             case .latched: state = .idle
@@ -29,25 +28,9 @@ struct MenuBarDrag {
         }
         switch state {
         case .idle:
-            guard eligible else { return .pass }
-            if type == .rightMouseDown { state = .rightOpening; return .openPinned }
-            guard type == .leftMouseDown else { return .pass }
-            state = .pending(point)
-            return .consume
-        case .pending(let start):
-            if type == .leftMouseDragged {
-                if point.y - start.y >= 8 {
-                    state = .active
-                    return .open(start)
-                }
-                return .consume
-            }
-            if type == .leftMouseUp { state = .idle; return .replayClick }
-            return .pass
-        case .active:
-            if type == .leftMouseDragged { return .update }
-            if type == .leftMouseUp { state = .idle; return .select }
-            return .pass
+            guard type == .rightMouseDown, eligible else { return .pass }
+            state = .rightOpening
+            return .openPinned
         case .rightOpening:
             if type == .rightMouseUp { state = .latched; return .consume }
             return type == .rightMouseDragged ? .consume : .pass
@@ -76,9 +59,7 @@ struct MenuBarDrag {
 final class MenuBarGesture {
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
-    private var drag = MenuBarDrag()
-    private var pendingDown: CGEvent?
-    private static let replayTag: Int64 = 0x4D5744524147
+    private var interaction = MenuBarInteraction()
     var containsPicker: ((CGPoint) -> Bool)?
     var onEvent: ((CGEventType, CGPoint) -> Void)?
 
@@ -101,35 +82,14 @@ final class MenuBarGesture {
                     if let tap = gesture.tap { CGEvent.tapEnable(tap: tap, enable: true) }
                     return Unmanaged.passUnretained(event)
                 }
-                if event.getIntegerValueField(.eventSourceUserData) == MenuBarGesture.replayTag {
-                    return Unmanaged.passUnretained(event)
-                }
                 let point = event.location
-                let eligible = (type == .leftMouseDown || type == .rightMouseDown) && gesture.isMenuBar(at: point)
-                let action = gesture.drag.handle(type, at: point, eligible: eligible,
+                let eligible = type == .rightMouseDown && gesture.isMenuBar(at: point)
+                let action = gesture.interaction.handle(type, at: point, eligible: eligible,
                     escape: event.getIntegerValueField(.keyboardEventKeycode) == 53,
                     insidePicker: gesture.containsPicker?(point) == true)
                 switch action {
                 case .pass: return Unmanaged.passUnretained(event)
-                case .consume:
-                    if type == .leftMouseDown { gesture.pendingDown = event.copy() }
-                    if type == .leftMouseUp { gesture.pendingDown = nil }
-                case .replayClick:
-                    if let down = gesture.pendingDown, let up = event.copy() {
-                        down.setIntegerValueField(.eventSourceUserData, value: MenuBarGesture.replayTag)
-                        up.setIntegerValueField(.eventSourceUserData, value: MenuBarGesture.replayTag)
-                        // Replay at the original control, preserving click count and modifiers.
-                        up.location = down.location
-                        down.post(tap: .cgSessionEventTap)
-                        up.post(tap: .cgSessionEventTap)
-                    }
-                    gesture.pendingDown = nil
-                case .open(let start):
-                    gesture.pendingDown = nil
-                    DispatchQueue.main.async {
-                        gesture.onEvent?(.leftMouseDown, start)
-                        gesture.onEvent?(.leftMouseDragged, point)
-                    }
+                case .consume: break
                 case .openPinned:
                     DispatchQueue.main.async { gesture.onEvent?(.rightMouseDown, point) }
                 case .update, .hover:
@@ -138,7 +98,6 @@ final class MenuBarGesture {
                 case .select:
                     DispatchQueue.main.async { gesture.onEvent?(.leftMouseUp, point) }
                 case .cancel, .cancelAndPass:
-                    gesture.pendingDown = nil
                     DispatchQueue.main.async { gesture.onEvent?(.keyDown, point) }
                     if action == .cancelAndPass { return Unmanaged.passUnretained(event) }
                 }
@@ -154,8 +113,7 @@ final class MenuBarGesture {
     }
 
     func finish() {
-        drag.reset()
-        pendingDown = nil
+        interaction.reset()
     }
 
     func stop() {

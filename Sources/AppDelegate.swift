@@ -118,7 +118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let primary = NSScreen.screens.first else { return }
         let location = NSPoint(x: point.x, y: primary.frame.maxY - point.y)
         switch type {
-        case .leftMouseDown, .rightMouseDown:
+        case .rightMouseDown:
             guard let screen = NSScreen.screens.first(where: {
                 location.x >= $0.frame.minX && location.x < $0.frame.maxX &&
                 location.y >= $0.frame.minY && location.y <= $0.frame.maxY
