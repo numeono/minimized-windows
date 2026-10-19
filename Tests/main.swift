@@ -103,3 +103,16 @@ for trusted in [false, true] {
 
 }
 print("PASS: setup alert has two visible buttons, no placeholder controls, and full instruction text")
+
+let enabledAlert = makeEnabledAlert()
+assert(enabledAlert.messageText == "Successfully enabled")
+assert(enabledAlert.buttons.map(\.title) == ["Got it"])
+let enabledContent = enabledAlert.window.contentView!
+let enabledButtons = descendants(enabledContent).compactMap { $0 as? NSButton }
+    .filter { !$0.isHiddenOrHasHiddenAncestor }
+assert(enabledButtons.count == 1 && enabledButtons[0].title == "Got it")
+let enabledInfo = descendants(enabledContent).compactMap { $0 as? NSTextField }
+    .first { $0.stringValue == enabledAlert.informativeText }!
+assert(enabledInfo.bounds.height >= enabledInfo.cell!.cellSize(forBounds:
+    NSRect(x: 0, y: 0, width: enabledInfo.bounds.width, height: 1000)).height - 1)
+print("PASS: enabled notice has one button and complete right-click instructions")

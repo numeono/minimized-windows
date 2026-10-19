@@ -29,7 +29,7 @@ Ordinary left-clicks and drags pass through unchanged. Drag activation and doubl
 
 ## Accessibility setup
 
-Without Accessibility access, the app shows a setup window with Open Accessibility Settings and Quit buttons. Enable Minimized Windows in System Settings. The app checks every two seconds and closes the setup window once menu-bar access works. If permission is revoked, the setup window returns. No menu-bar icon is added.
+Without Accessibility access, the app shows a setup window with Open Accessibility Settings and Quit buttons. Enable Minimized Windows in System Settings. The app checks every two seconds and closes the setup window once menu-bar access works. If permission is revoked, the setup window returns. No menu-bar icon is added. Once access works, a one-time “Successfully enabled” window explains how to open the list. Choose Got it to dismiss it; it will not appear on subsequent launches.
 
 ## Requirements
 

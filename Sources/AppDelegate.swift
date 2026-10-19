@@ -9,6 +9,8 @@ var minimizeTimestamps: [CGWindowID: Date] = [:]
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var accessAlert: NSAlert?
+    private var enabledAlert: NSAlert?
+    private let enabledNoticeKey = "hasAcknowledgedMenuBarSetup"
     private var alertHasAccessibility: Bool?
     private let gesture = MenuBarGesture()
     private let windowPicker = WindowPicker()
@@ -41,9 +43,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             accessAlert?.window.orderOut(nil)
             accessAlert = nil
             alertHasAccessibility = nil
+            showEnabledNoticeIfNeeded()
         } else {
+            enabledAlert?.window.orderOut(nil)
+            enabledAlert = nil
             showAccessSetup()
         }
+    }
+
+    private func showEnabledNoticeIfNeeded() {
+        guard enabledAlert == nil, !UserDefaults.standard.bool(forKey: enabledNoticeKey) else { return }
+        let alert = makeEnabledAlert()
+        alert.buttons[0].target = self
+        alert.buttons[0].action = #selector(dismissEnabledNotice)
+        enabledAlert = alert
+        alert.window.center()
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func dismissEnabledNotice() {
+        enabledAlert?.window.orderOut(nil)
+        enabledAlert = nil
+        UserDefaults.standard.set(true, forKey: enabledNoticeKey)
     }
 
     private func showAccessSetup() {
@@ -197,6 +219,17 @@ func makeAccessSetupAlert(trusted: Bool) -> NSAlert {
     alert.showsSuppressionButton = false
     alert.addButton(withTitle: "Open Accessibility Settings")
     alert.addButton(withTitle: "Quit")
+    alert.layout()
+    return alert
+}
+
+func makeEnabledAlert() -> NSAlert {
+    let alert = NSAlert()
+    alert.messageText = "Successfully enabled"
+    alert.informativeText = "Right-click in the middle of the menu bar to see your minimized windows. Click a window in the list to restore it."
+    alert.showsHelp = false
+    alert.showsSuppressionButton = false
+    alert.addButton(withTitle: "Got it")
     alert.layout()
     return alert
 }
