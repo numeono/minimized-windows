@@ -7,4 +7,4 @@ swiftc Sources/AppDelegate.swift Sources/MenuBarGesture.swift Sources/WindowPick
     -import-objc-header Sources/BridgingHeader.h \
     -framework Cocoa -framework ServiceManagement -framework ApplicationServices \
     -o "$TEST_BINARY"
-"$TEST_BINARY"
+"$TEST_BINARY" "$@"

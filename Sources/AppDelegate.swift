@@ -15,13 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pollTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        gesture.onEvent = { [weak self] type, point in
-            self?.handleGesture(type, at: point)
-        }
-        gesture.containsPicker = { [weak self] point in
-            guard let primary = NSScreen.screens.first else { return false }
-            return self?.windowPicker.contains(NSPoint(x: point.x, y: primary.frame.maxY - point.y)) == true
-        }
+        gesture.onOpen = { [weak self] point in self?.showWindowMenu(at: point) }
         updateGestureAvailability()
 
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -79,26 +73,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(url)
     }
 
-    private func handleGesture(_ type: CGEventType, at point: CGPoint) {
+    private func showWindowMenu(at point: CGPoint) {
         guard let primary = NSScreen.screens.first else { return }
         let location = NSPoint(x: point.x, y: primary.frame.maxY - point.y)
-        switch type {
-        case .rightMouseDown:
-            guard let screen = NSScreen.screens.first(where: {
-                location.x >= $0.frame.minX && location.x < $0.frame.maxX &&
-                location.y >= $0.frame.minY && location.y <= $0.frame.maxY
-            }) else { return }
-            recordNewlyMinimized()
-            windowPicker.show(windows: getMinimizedWindows(), on: screen) { [weak self] info in
-                self?.restoreWindow(info)
-            }
-        case .leftMouseDragged:
-            windowPicker.highlight(at: location)
-        case .leftMouseUp:
-            windowPicker.release(at: location)
-        case .keyDown:
-            windowPicker.dismiss()
-        default: break
+        guard let screen = NSScreen.screens.first(where: {
+            location.x >= $0.frame.minX && location.x < $0.frame.maxX &&
+            location.y >= $0.frame.minY && location.y <= $0.frame.maxY
+        }) else { return }
+        recordNewlyMinimized()
+        windowPicker.show(windows: getMinimizedWindows(), on: screen, at: location) { [weak self] info in
+            self?.restoreWindow(info)
         }
     }
 

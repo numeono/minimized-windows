@@ -6,68 +6,61 @@ let screen = NSScreen.screens.first!
 let picker = WindowPicker()
 let fixture = WindowInfo(pid: getpid(), cgWindowID: 1,
     axWindow: AXUIElementCreateApplication(getpid()),
-    title: "A very long window title that should be shortened to fit comfortably in the dropdown — document.txt",
-    appIcon: NSImage(named: NSImage.applicationIconName), minimizedAt: Date())
-var restored: [CGWindowID] = []
-let top = screen.frame.maxY - menuBarHeight(screen)
-let firstRow = NSPoint(x: screen.frame.midX, y: top - 21)
-func show() { picker.show(windows: [fixture], on: screen) { restored.append($0.cgWindowID) } }
-show()
-let panel = app.windows.first { $0.isVisible && $0 is NSPanel }!
-assert(abs(panel.frame.midX - screen.frame.midX) < 0.1)
-assert(abs(panel.frame.maxY - top) < 0.1)
-assert(panel.frame.width == min(360, screen.frame.width - 16))
-picker.highlight(at: firstRow)
-// Render the actual dropdown view for visual inspection.
-let view = panel.contentView!
-view.display()
-if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
-    view.cacheDisplay(in: view.bounds, to: bitmap)
-    try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/minimized-windows-picker.png"))
-}
-picker.release(at: firstRow)
-assert(restored == [1], "Release over the row must select exactly once")
-picker.release(at: firstRow)
-assert(restored == [1], "Repeated release must not restore twice")
-show()
-picker.release(at: NSPoint(x: screen.frame.minX, y: screen.frame.midY))
-assert(restored == [1], "Release outside must cancel")
-show()
-picker.dismiss()
-picker.release(at: firstRow)
-assert(restored == [1], "Escape/dismiss must cancel")
-picker.show(windows: [], on: screen) { _ in fatalError("Empty row selected") }
-picker.release(at: firstRow)
+    title: "Design notes — macOS menu appearance and window selection behavior",
+    appIcon: NSWorkspace.shared.icon(forFile: "/System/Applications/TextEdit.app"), minimizedAt: Date())
+let menu = picker.makeMenu(windows: [fixture])
+assert(menu.items.count == 3)
+assert(menu.items[0].image?.size == NSSize(width: 16, height: 16))
+assert(menu.items[0].title == String(fixture.title.prefix(41)) + "…")
+assert(menu.items[0].toolTip == fixture.title)
+assert(menu.items[1].isSeparatorItem)
+assert(menu.items[2].title == "Quit")
+assert(menu.size.width >= 360)
+let click = NSPoint(x: screen.frame.midX + 50, y: screen.frame.maxY - 10)
+let origin = picker.menuOrigin(size: menu.size, screen: screen, point: click)
+assert(abs(origin.x + menu.size.width / 2 - click.x) < 0.1)
+assert(abs(origin.y - (click.y - 4)) < 0.1)
+let left = picker.menuOrigin(size: menu.size, screen: screen, point: NSPoint(x: screen.frame.minX, y: click.y))
+let right = picker.menuOrigin(size: menu.size, screen: screen, point: NSPoint(x: screen.frame.maxX, y: click.y))
+assert(left.x >= screen.frame.minX)
+assert(right.x + menu.size.width <= screen.frame.maxX)
+let emptyMenu = picker.makeMenu(windows: [])
+assert(emptyMenu.items[0].title == "No minimized windows")
+assert(!emptyMenu.items[0].isEnabled)
+
 var interaction = MenuBarInteraction()
-let start = CGPoint(x: 500, y: 5)
-assert(interaction.handle(.rightMouseDown, at: start) == .pass)
-assert(interaction.handle(.leftMouseDown, at: start) == .pass)
 for type in [CGEventType.leftMouseDown, .leftMouseDragged, .leftMouseUp] {
-    assert(interaction.handle(type, at: start, eligible: true) == .pass,
-           "Left clicks and drags must pass through even on the menu bar")
+    assert(interaction.handle(type, eligible: true) == .pass)
 }
-assert(interaction.handle(.rightMouseDown, at: start, eligible: true) == .openPinned)
-assert(interaction.handle(.rightMouseUp, at: start) == .consume)
-assert(interaction.handle(.mouseMoved, at: start) == .hover)
-assert(interaction.handle(.leftMouseDown, at: start, insidePicker: true) == .update)
-assert(interaction.handle(.leftMouseUp, at: start, insidePicker: true) == .select)
-assert(interaction.handle(.leftMouseUp, at: start) == .pass)
-assert(interaction.handle(.rightMouseDown, at: start, eligible: true) == .openPinned)
-assert(interaction.handle(.rightMouseUp, at: start) == .consume)
-assert(interaction.handle(.leftMouseDown, at: start) == .cancelAndPass)
-assert(interaction.handle(.rightMouseDown, at: start, eligible: true) == .openPinned)
-assert(interaction.handle(.rightMouseUp, at: start) == .consume)
-assert(interaction.handle(.keyDown, at: start, escape: true) == .cancel)
-assert(interaction.handle(.rightMouseDown, at: start, eligible: true) == .openPinned)
-assert(interaction.handle(.keyDown, at: start, escape: true) == .cancel)
-assert(interaction.handle(.rightMouseUp, at: start) == .consume)
-assert(shortenedWindowTitle(fixture.title) == String(fixture.title.prefix(41)) + "…")
+assert(interaction.handle(.rightMouseDown) == .pass)
+assert(interaction.handle(.rightMouseDown, eligible: true) == .consume)
+assert(interaction.handle(.rightMouseDragged) == .consume)
+assert(interaction.handle(.rightMouseUp) == .open)
+assert(interaction.handle(.rightMouseUp) == .pass)
+interaction.reset()
+assert(interaction.handle(.rightMouseUp) == .pass)
 let frame = CGRect(x: -1920, y: 900, width: 1920, height: 1080)
 for y in [frame.maxY, frame.maxY - 1, frame.maxY - 16, frame.maxY - 32] {
     assert(menuBarContains(CGPoint(x: -960, y: y), frame: frame, height: 32))
 }
 assert(!menuBarContains(CGPoint(x: -960, y: frame.maxY - 33), frame: frame, height: 32))
-assert(!menuBarContains(CGPoint(x: 1, y: frame.maxY), frame: frame, height: 32))
-assert(shortenedWindowTitle(fixture.title).count == 42)
 assert(shortenedWindowTitle("Short title") == "Short title")
-print("PASS: persistent right-click, click selection, outside-click/Escape dismissal, prefix titles, ordinary left-click/drag passthrough, release selection, Escape cancellation, centered dropdown, release selection, repeat protection, outside/dismiss cancellation, empty list, full-height boundaries, title truncation")
+
+// Exercise a real AppKit tracking session, its action, and its cancellation.
+var selected: [CGWindowID] = []
+var timerFired = false
+let timer = Timer(timeInterval: 0.1, repeats: false) { _ in
+    timerFired = true
+    picker.menu?.performActionForItem(at: 0)
+    picker.dismiss()
+}
+RunLoop.main.add(timer, forMode: .common)
+RunLoop.main.add(timer, forMode: .eventTracking)
+picker.show(windows: [fixture], on: screen, at: click) { selected.append($0.cgWindowID) }
+assert(timerFired && selected == [1])
+assert(picker.menu == nil)
+let cancelTimer = Timer(timeInterval: 0.1, repeats: false) { _ in picker.dismiss() }
+RunLoop.main.add(cancelTimer, forMode: .common)
+RunLoop.main.add(cancelTimer, forMode: .eventTracking)
+picker.show(windows: [fixture], on: screen, at: click) { _ in fatalError("Cancellation selected a window") }
+print("PASS: native menu tracking/action/cancellation, icons, separators, prefix titles, cursor-centered anchor, right-click opening, left-button passthrough, empty list, full-height boundaries")
