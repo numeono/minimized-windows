@@ -43,10 +43,13 @@ for type in [CGEventType.leftMouseDown, .leftMouseDragged, .leftMouseUp] {
 }
 assert(interaction.handle(.rightMouseDown) == .pass)
 assert(interaction.handle(.rightMouseDown, eligible: true) == .consume)
-assert(interaction.handle(.rightMouseDragged) == .consume)
 assert(interaction.handle(.rightMouseUp) == .open)
 assert(interaction.handle(.rightMouseUp) == .pass)
 interaction.reset()
+assert(interaction.handle(.rightMouseUp) == .pass)
+assert(interaction.handle(.rightMouseDown, eligible: true) == .consume)
+assert(interaction.handle(.rightMouseDragged) == .openHeld)
+assert(interaction.handle(.rightMouseDragged) == .pass)
 assert(interaction.handle(.rightMouseUp) == .pass)
 let frame = CGRect(x: -1920, y: 900, width: 1920, height: 1080)
 for y in [frame.maxY, frame.maxY - 1, frame.maxY - 16, frame.maxY - 32] {
@@ -116,3 +119,37 @@ let enabledInfo = descendants(enabledContent).compactMap { $0 as? NSTextField }
 assert(enabledInfo.bounds.height >= enabledInfo.cell!.cellSize(forBounds:
     NSRect(x: 0, y: 0, width: enabledInfo.bounds.width, height: 1000)).height - 1)
 print("PASS: enabled notice has one button and complete right-click instructions")
+
+assert(UpdateChecker.isNewer("v1.12", than: "1.9"))
+assert(!UpdateChecker.isNewer("1.9", than: "1.12"))
+assert(!UpdateChecker.isNewer("v1.12.0", than: "1.12"))
+assert(!UpdateChecker.isNewer("v2.0-beta", than: "1.12"))
+assert(!UpdateChecker.isNewer("oops", than: "1.12"))
+func releaseData(tag: String = "v1.12", draft: Bool = false, prerelease: Bool = false,
+                 url: String = "https://github.com/numeono/minimized-windows/releases/tag/v1.12") -> Data {
+    try! JSONSerialization.data(withJSONObject: ["tag_name": tag, "draft": draft,
+        "prerelease": prerelease, "html_url": url])
+}
+assert(UpdateChecker.update(from: releaseData(), statusCode: 200, currentVersion: "1.11")?.version == "v1.12")
+for status in [403, 404, 429, 500] {
+    assert(UpdateChecker.update(from: releaseData(), statusCode: status, currentVersion: "1.11") == nil)
+}
+for data in [releaseData(draft: true), releaseData(prerelease: true),
+             releaseData(url: "https://example.com/update"), Data("broken json".utf8)] {
+    assert(UpdateChecker.update(from: data, statusCode: 200, currentVersion: "1.11") == nil)
+}
+assert(UpdateChecker.update(from: releaseData(), statusCode: 200, currentVersion: "1.12") == nil)
+let updateAlert = makeUpdateAlert(version: "v1.12")
+assert(updateAlert.buttons.map(\.title) == ["View Update", "Later"])
+let heldTimer = Timer(timeInterval: 0.1, repeats: false) { _ in
+    RunLoop.main.perform(inModes: [.eventTracking, .common]) {
+        picker.completeHeldSelection(picker.menu?.items[0])
+    }
+}
+RunLoop.main.add(heldTimer, forMode: .eventTracking)
+picker.show(windows: [fixture], on: screen, at: click) { selected.append($0.cgWindowID) }
+assert(selected == [1, 1], "Held release must dispatch exactly one window action")
+let outsideTimer = Timer(timeInterval: 0.1, repeats: false) { _ in picker.completeHeldSelection(nil) }
+RunLoop.main.add(outsideTimer, forMode: .eventTracking)
+picker.show(windows: [fixture], on: screen, at: click) { _ in fatalError("Outside release selected a window") }
+print("PASS: held selection/cancellation, version comparisons, stable-release filtering, error handling, update prompt")

@@ -8,6 +8,9 @@ var minimizeTimestamps: [CGWindowID: Date] = [:]
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var pendingUpdate: ReleaseUpdate?
+    private var updateAlert: NSAlert?
+    private var updateURL: URL?
     private var accessAlert: NSAlert?
     private var enabledAlert: NSAlert?
     private let enabledNoticeKey = "hasAcknowledgedMenuBarSetup"
@@ -18,11 +21,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         gesture.onOpen = { [weak self] point in self?.showWindowMenu(at: point) }
+        gesture.onHeldRelease = { [weak self] in self?.windowPicker.releaseHeldGesture() }
         updateGestureAvailability()
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        UpdateChecker.check(currentVersion: version) { [weak self] update in
+            self?.pendingUpdate = update
+            self?.showUpdateIfReady()
+        }
 
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.recordNewlyMinimized()
             self?.updateGestureAvailability()
+            self?.showUpdateIfReady()
         }
         recordNewlyMinimized()
         registerLoginItem()
@@ -49,6 +59,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             enabledAlert = nil
             showAccessSetup()
         }
+    }
+
+    private func showUpdateIfReady() {
+        guard let update = pendingUpdate, accessAlert == nil, enabledAlert == nil,
+              windowPicker.menu == nil, updateAlert == nil else { return }
+        pendingUpdate = nil
+        updateURL = update.url
+        let alert = makeUpdateAlert(version: update.version)
+        alert.buttons[0].target = self
+        alert.buttons[0].action = #selector(viewUpdate)
+        alert.buttons[1].target = self
+        alert.buttons[1].action = #selector(dismissUpdate)
+        updateAlert = alert
+        alert.window.center()
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func viewUpdate() {
+        if let url = updateURL { NSWorkspace.shared.open(url) }
+        dismissUpdate()
+    }
+
+    @objc private func dismissUpdate() {
+        updateAlert?.window.orderOut(nil)
+        updateAlert = nil
+        updateURL = nil
     }
 
     private func showEnabledNoticeIfNeeded() {
@@ -230,6 +267,18 @@ func makeEnabledAlert() -> NSAlert {
     alert.showsHelp = false
     alert.showsSuppressionButton = false
     alert.addButton(withTitle: "Got it")
+    alert.layout()
+    return alert
+}
+
+func makeUpdateAlert(version: String) -> NSAlert {
+    let alert = NSAlert()
+    alert.messageText = "Update available"
+    alert.informativeText = "Minimized Windows \(version) is available. Open the GitHub release page to download the update."
+    alert.showsHelp = false
+    alert.showsSuppressionButton = false
+    alert.addButton(withTitle: "View Update")
+    alert.addButton(withTitle: "Later")
     alert.layout()
     return alert
 }

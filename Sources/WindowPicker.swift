@@ -8,6 +8,7 @@ func shortenedWindowTitle(_ title: String) -> String {
 /// AppKit supplies the menu material, corner treatment, typography, and tracking.
 final class WindowPicker: NSObject {
     private(set) var menu: NSMenu?
+    private var heldReleasePending = false
     private var selection: ((WindowInfo) -> Void)?
 
     func show(windows: [WindowInfo], on screen: NSScreen, at point: NSPoint, selection: @escaping (WindowInfo) -> Void) {
@@ -15,6 +16,12 @@ final class WindowPicker: NSObject {
         self.selection = selection
         let menu = makeMenu(windows: windows)
         self.menu = menu
+        if heldReleasePending {
+            heldReleasePending = false
+            RunLoop.main.perform(inModes: [.eventTracking, .common]) { [weak self] in
+                self?.releaseHeldGesture()
+            }
+        }
         menu.popUp(positioning: nil, at: menuOrigin(size: menu.size, screen: screen, point: point), in: nil)
         self.menu = nil
         self.selection = nil
@@ -64,6 +71,20 @@ final class WindowPicker: NSObject {
     @objc private func chooseWindow(_ sender: NSMenuItem) {
         guard let window = sender.representedObject as? WindowInfo else { return }
         selection?(window)
+    }
+
+    func releaseHeldGesture() {
+        guard menu != nil else { heldReleasePending = true; return }
+        completeHeldSelection(menu?.highlightedItem)
+    }
+
+    func completeHeldSelection(_ item: NSMenuItem?) {
+        guard let menu = menu else { return }
+        if let item = item, item.isEnabled, !item.isSeparatorItem {
+            let index = menu.index(of: item)
+            if index >= 0 { menu.performActionForItem(at: index) }
+        }
+        menu.cancelTracking()
     }
 
     func dismiss() { menu?.cancelTracking() }

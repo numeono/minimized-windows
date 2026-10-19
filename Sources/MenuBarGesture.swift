@@ -1,9 +1,8 @@
 import Cocoa
 
-/// Wait for the opening right-click to finish before entering AppKit tracking.
-/// This prevents its mouse-up from dismissing the newly opened menu.
+/// A click opens on release; a held drag opens while the button is still down.
 struct MenuBarInteraction {
-    enum Action: Equatable { case pass, consume, open }
+    enum Action: Equatable { case pass, consume, open, openHeld }
     private var awaitingRelease = false
 
     mutating func reset() { awaitingRelease = false }
@@ -11,7 +10,7 @@ struct MenuBarInteraction {
     mutating func handle(_ type: CGEventType, eligible: Bool = false) -> Action {
         if awaitingRelease {
             if type == .rightMouseUp { awaitingRelease = false; return .open }
-            if type == .rightMouseDragged { return .consume }
+            if type == .rightMouseDragged { awaitingRelease = false; return .openHeld }
         }
         if type == .rightMouseDown, eligible {
             awaitingRelease = true
@@ -27,6 +26,8 @@ final class MenuBarGesture {
     private var interaction = MenuBarInteraction()
     private var openingPoint = CGPoint.zero
     private var trackingMenu = false
+    private var selectingWhileHeld = false
+    var onHeldRelease: (() -> Void)?
     var onOpen: ((CGPoint) -> Void)?
 
     @discardableResult
@@ -46,19 +47,34 @@ final class MenuBarGesture {
                     if let tap = gesture.tap { CGEvent.tapEnable(tap: tap, enable: true) }
                     return Unmanaged.passUnretained(event)
                 }
-                // While open, native menu tracking receives all input unchanged.
-                guard !gesture.trackingMenu else { return Unmanaged.passUnretained(event) }
+                // Native tracking handles motion and ordinary clicks. Only the
+                // opening held gesture needs an explicit release action.
+                if gesture.trackingMenu {
+                    if gesture.selectingWhileHeld && type == .rightMouseUp {
+                        gesture.selectingWhileHeld = false
+                        // The menu is running a nested tracking loop inside the
+                        // main-queue open callback. Use that run loop rather than
+                        // queueing behind the still-blocked main-queue callback.
+                        RunLoop.main.perform(inModes: [.eventTracking, .common]) {
+                            gesture.onHeldRelease?()
+                        }
+                        return nil
+                    }
+                    return Unmanaged.passUnretained(event)
+                }
                 let eligible = type == .rightMouseDown && gesture.isMenuBar(at: event.location)
                 switch gesture.interaction.handle(type, eligible: eligible) {
                 case .pass: return Unmanaged.passUnretained(event)
                 case .consume:
                     if type == .rightMouseDown { gesture.openingPoint = event.location }
-                case .open:
+                case .open, .openHeld:
+                    gesture.selectingWhileHeld = type == .rightMouseDragged
                     let point = gesture.openingPoint
                     gesture.trackingMenu = true
                     DispatchQueue.main.async {
                         gesture.onOpen?(point)
                         gesture.trackingMenu = false
+                        gesture.selectingWhileHeld = false
                     }
                 }
                 return nil
