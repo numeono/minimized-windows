@@ -26,7 +26,7 @@ The screenshot below shows the historical icon interface. The current app has no
 
 The dropdown uses a native macOS menu, including the system glass material, corner treatment, spacing, selection highlight, and separator above Quit. It is at least 360 points wide and centered horizontally on the right-click position, with its top edge below the menu bar from the moment it opens. Near a display edge, its position adjusts to keep it visible. The material follows the macOS version, appearance, and accessibility settings. Titles show their first 41 characters followed by an ellipsis when needed. Hover over an entry to see its full title in a tooltip. Each window row has an app icon, with image visibility explicitly enabled on macOS 27. Recently minimized windows appear first.
 
-Ordinary left-clicks and drags pass through unchanged. Left-button drag activation and double-click activation are not enabled. With an automatically hidden menu bar, reveal the bar first. The app registers itself to launch at login.
+Ordinary left-clicks and drags pass through unchanged. Left-button drag activation and double-click activation are not enabled. With an automatically hidden menu bar, reveal the bar first. On macOS 13 and later, the app registers itself to launch at login and checks the resulting status. If approval is needed or registration fails, it shows a setup window linking to Login Items. Keep the app in Applications and open it once after installing. On macOS 12, add it manually in System Preferences → Users & Groups → Login Items. Launch at login starts the app after you sign in, not before login.
 
 ## Accessibility setup
 

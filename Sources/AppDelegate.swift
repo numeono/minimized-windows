@@ -8,6 +8,8 @@ var minimizeTimestamps: [CGWindowID: Date] = [:]
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var pendingLoginMessage: String?
+    private var loginAlert: NSAlert?
     private var pendingUpdate: ReleaseUpdate?
     private var updateAlert: NSAlert?
     private var updateURL: URL?
@@ -32,6 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.recordNewlyMinimized()
             self?.updateGestureAvailability()
+            self?.showLoginNoticeIfReady()
             self?.showUpdateIfReady()
         }
         recordNewlyMinimized()
@@ -63,7 +66,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showUpdateIfReady() {
         guard let update = pendingUpdate, accessAlert == nil, enabledAlert == nil,
-              windowPicker.menu == nil, updateAlert == nil else { return }
+              windowPicker.menu == nil, updateAlert == nil, loginAlert == nil,
+              pendingLoginMessage == nil else { return }
         pendingUpdate = nil
         updateURL = update.url
         let alert = makeUpdateAlert(version: update.version)
@@ -163,11 +167,66 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func registerLoginItem() {
         if #available(macOS 13.0, *) {
-            try? SMAppService.mainApp.register()
+            let service = SMAppService.mainApp
+            if service.status == .enabled { return }
+            if service.status != .requiresApproval {
+                do {
+                    try service.register()
+                } catch {
+                    // Read the final status too: registration may require approval.
+                    if service.status != .enabled && service.status != .requiresApproval {
+                        pendingLoginMessage = "Minimized Windows could not enable launch at login. Keep the app in Applications, then add or enable it in System Settings → General → Login Items."
+                        return
+                    }
+                }
+            }
+            switch service.status {
+            case .enabled: break
+            case .requiresApproval:
+                pendingLoginMessage = "Enable Minimized Windows in System Settings → General → Login Items so it opens automatically when you log in."
+            default:
+                pendingLoginMessage = "Launch at login is not enabled yet. Add or enable Minimized Windows in System Settings → General → Login Items."
+            }
         } else {
-            SMLoginItemSetEnabled(Bundle.main.bundleIdentifier! as CFString, true)
+            // SMLoginItemSetEnabled requires a bundled helper, not the main app.
+            pendingLoginMessage = "On macOS 12, add Minimized Windows in System Preferences → Users & Groups → Login Items to open it automatically when you log in."
         }
     }
+
+    private func showLoginNoticeIfReady() {
+        if #available(macOS 13.0, *), SMAppService.mainApp.status == .enabled {
+            pendingLoginMessage = nil
+            loginAlert?.window.orderOut(nil)
+            loginAlert = nil
+            return
+        }
+        guard let message = pendingLoginMessage, loginAlert == nil, accessAlert == nil,
+              enabledAlert == nil, updateAlert == nil, windowPicker.menu == nil else { return }
+        pendingLoginMessage = nil
+        let alert = makeLoginAlert(message: message)
+        alert.buttons[0].target = self
+        alert.buttons[0].action = #selector(openLoginSettings)
+        alert.buttons[1].target = self
+        alert.buttons[1].action = #selector(dismissLoginNotice)
+        loginAlert = alert
+        alert.window.center()
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func openLoginSettings() {
+        if #available(macOS 13.0, *) {
+            SMAppService.openSystemSettingsLoginItems()
+        } else {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Preferences.app"))
+        }
+    }
+
+    @objc private func dismissLoginNotice() {
+        loginAlert?.window.orderOut(nil)
+        loginAlert = nil
+    }
+
 }
 
 // MARK: - Window Info
@@ -278,6 +337,18 @@ func makeUpdateAlert(version: String) -> NSAlert {
     alert.showsHelp = false
     alert.showsSuppressionButton = false
     alert.addButton(withTitle: "View Update")
+    alert.addButton(withTitle: "Later")
+    alert.layout()
+    return alert
+}
+
+func makeLoginAlert(message: String) -> NSAlert {
+    let alert = NSAlert()
+    alert.messageText = "Enable launch at login"
+    alert.informativeText = message
+    alert.showsHelp = false
+    alert.showsSuppressionButton = false
+    alert.addButton(withTitle: "Open Login Items")
     alert.addButton(withTitle: "Later")
     alert.layout()
     return alert

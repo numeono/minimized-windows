@@ -153,3 +153,12 @@ let outsideTimer = Timer(timeInterval: 0.1, repeats: false) { _ in picker.comple
 RunLoop.main.add(outsideTimer, forMode: .eventTracking)
 picker.show(windows: [fixture], on: screen, at: click) { _ in fatalError("Outside release selected a window") }
 print("PASS: held selection/cancellation, version comparisons, stable-release filtering, error handling, update prompt")
+
+let loginAlert = makeLoginAlert(message: "Enable Minimized Windows in System Settings → General → Login Items so it opens automatically when you log in.")
+assert(loginAlert.buttons.map(\.title) == ["Open Login Items", "Later"])
+let loginContent = loginAlert.window.contentView!
+let loginInfo = descendants(loginContent).compactMap { $0 as? NSTextField }
+    .first { $0.stringValue == loginAlert.informativeText }!
+assert(loginInfo.bounds.height >= loginInfo.cell!.cellSize(forBounds:
+    NSRect(x: 0, y: 0, width: loginInfo.bounds.width, height: 1000)).height - 1)
+print("PASS: login setup notice has the intended controls and complete instructions")
