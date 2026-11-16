@@ -12,10 +12,6 @@ Useful if you keep your Dock hidden or [**have your Dock disabled**](https://git
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-## Original icon interface
-
-The screenshot below shows the historical icon interface. The current app has no menu-bar icon.
-
 ![Minimized Windows menu showing minimized windows from several apps](assets/minimized-windows-menu.jpg)
 
 ## Controls
