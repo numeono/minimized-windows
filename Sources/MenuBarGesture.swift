@@ -3,17 +3,31 @@ import Cocoa
 /// A click opens on release; a held drag opens while the button is still down.
 struct MenuBarInteraction {
     enum Action: Equatable { case pass, consume, open, openHeld }
-    private var awaitingRelease = false
+    private var openingButton: CGMouseButton?
+    private(set) var heldReleaseType: CGEventType?
 
-    mutating func reset() { awaitingRelease = false }
+    mutating func reset() {
+        openingButton = nil
+        heldReleaseType = nil
+    }
 
-    mutating func handle(_ type: CGEventType, eligible: Bool = false) -> Action {
-        if awaitingRelease {
-            if type == .rightMouseUp { awaitingRelease = false; return .open }
-            if type == .rightMouseDragged { awaitingRelease = false; return .openHeld }
+    mutating func handle(_ type: CGEventType, eligible: Bool = false,
+                         flags: CGEventFlags = []) -> Action {
+        if let button = openingButton {
+            let release: CGEventType = button == .left ? .leftMouseUp : .rightMouseUp
+            let drag: CGEventType = button == .left ? .leftMouseDragged : .rightMouseDragged
+            if type == release { openingButton = nil; return .open }
+            if type == drag {
+                openingButton = nil
+                heldReleaseType = release
+                return .openHeld
+            }
+            return .pass
         }
-        if type == .rightMouseDown, eligible {
-            awaitingRelease = true
+        if eligible && (type == .rightMouseDown ||
+                        (type == .leftMouseDown && flags.contains(.maskControl))) {
+            openingButton = type == .leftMouseDown ? .left : .right
+            heldReleaseType = nil
             return .consume
         }
         return .pass
@@ -26,7 +40,7 @@ final class MenuBarGesture {
     private var interaction = MenuBarInteraction()
     private var openingPoint = CGPoint.zero
     private var trackingMenu = false
-    private var selectingWhileHeld = false
+    private var heldReleaseType: CGEventType?
     var onHeldRelease: (() -> Void)?
     var onOpen: ((CGPoint) -> Void)?
 
@@ -34,7 +48,8 @@ final class MenuBarGesture {
     func start() -> Bool {
         if tap != nil { return true }
         guard AXIsProcessTrusted() else { return false }
-        let mask = [CGEventType.rightMouseDown, .rightMouseDragged, .rightMouseUp]
+        let mask = [CGEventType.rightMouseDown, .rightMouseDragged, .rightMouseUp,
+                    .leftMouseDown, .leftMouseDragged, .leftMouseUp]
             .reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap, place: .headInsertEventTap,
@@ -50,8 +65,8 @@ final class MenuBarGesture {
                 // Native tracking handles motion and ordinary clicks. Only the
                 // opening held gesture needs an explicit release action.
                 if gesture.trackingMenu {
-                    if gesture.selectingWhileHeld && type == .rightMouseUp {
-                        gesture.selectingWhileHeld = false
+                    if type == gesture.heldReleaseType {
+                        gesture.heldReleaseType = nil
                         // The menu is running a nested tracking loop inside the
                         // main-queue open callback. Use that run loop rather than
                         // queueing behind the still-blocked main-queue callback.
@@ -62,19 +77,21 @@ final class MenuBarGesture {
                     }
                     return Unmanaged.passUnretained(event)
                 }
-                let eligible = type == .rightMouseDown && gesture.isMenuBar(at: event.location)
-                switch gesture.interaction.handle(type, eligible: eligible) {
+                let secondaryDown = type == .rightMouseDown ||
+                    (type == .leftMouseDown && event.flags.contains(.maskControl))
+                let eligible = secondaryDown && gesture.isMenuBar(at: event.location)
+                switch gesture.interaction.handle(type, eligible: eligible, flags: event.flags) {
                 case .pass: return Unmanaged.passUnretained(event)
                 case .consume:
-                    if type == .rightMouseDown { gesture.openingPoint = event.location }
+                    gesture.openingPoint = event.location
                 case .open, .openHeld:
-                    gesture.selectingWhileHeld = type == .rightMouseDragged
+                    gesture.heldReleaseType = gesture.interaction.heldReleaseType
                     let point = gesture.openingPoint
                     gesture.trackingMenu = true
                     DispatchQueue.main.async {
                         gesture.onOpen?(point)
                         gesture.trackingMenu = false
-                        gesture.selectingWhileHeld = false
+                        gesture.heldReleaseType = nil
                     }
                 }
                 return nil

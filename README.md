@@ -1,6 +1,6 @@
 # Minimized Windows
 
-A lightweight macOS app that lists your minimized windows. Right-click the menu bar once, then click a window in the list to restore it.
+A lightweight macOS app that lists your minimized windows. Right-click or Control-click the menu bar once, then click a window in the list to restore it.
 
 Useful if you keep your Dock hidden or [**have your Dock disabled**](https://github.com/numeono/macOS#disable-the-dock).
 
@@ -16,13 +16,13 @@ Useful if you keep your Dock hidden or [**have your Dock disabled**](https://git
 
 ## Controls
 
-- Right-click the menu bar once to leave the list open, then click a window. Click outside the dropdown or press Escape to dismiss it.
-- Or hold the right mouse button on the menu bar, slide down into the list, and release over a window to restore it. Releasing without a highlighted item cancels.
+- Right-click or Control-click the menu bar once to leave the list open, then click a window. Click outside the dropdown or press Escape to dismiss it.
+- Or hold the right mouse button, or Control and the left mouse button, on the menu bar, slide down into the list, and release over a window to restore it. Releasing without a highlighted item cancels.
 - Choose Quit in the dropdown to stop the app.
 
-The dropdown uses a native macOS menu, including the system glass material, corner treatment, spacing, selection highlight, and separator above Quit. It is at least 360 points wide and centered horizontally on the right-click position, with its top edge below the menu bar from the moment it opens. Near a display edge, its position adjusts to keep it visible. The material follows the macOS version, appearance, and accessibility settings. Titles show their first 41 characters followed by an ellipsis when needed. Hover over an entry to see its full title in a tooltip. Each window row has an app icon, with image visibility explicitly enabled on macOS 27. Recently minimized windows appear first.
+The dropdown uses a native macOS menu, including the system glass material, corner treatment, spacing, selection highlight, and separator above Quit. It is at least 360 points wide and centered horizontally on the click position, with its top edge below the menu bar from the moment it opens. Near a display edge, its position adjusts to keep it visible. The material follows the macOS version, appearance, and accessibility settings. Titles show their first 41 characters followed by an ellipsis when needed. Hover over an entry to see its full title in a tooltip. Each window row has an app icon, with image visibility explicitly enabled on macOS 27. Recently minimized windows appear first.
 
-Ordinary left-clicks and drags pass through unchanged. Left-button drag activation and double-click activation are not enabled. With an automatically hidden menu bar, reveal the bar first. On macOS 13 and later, the app registers itself to launch at login and checks the resulting status. If approval is needed or registration fails, it shows a setup window linking to Login Items. Keep the app in Applications and open it once after installing. On macOS 12, add it manually in System Preferences → Users & Groups → Login Items. Launch at login starts the app after you sign in, not before login.
+Ordinary left-clicks and drags pass through unchanged. Control-click also supports dragging into the list and releasing to select a window. You can release Control after starting the gesture. Double-click activation is not enabled. With an automatically hidden menu bar, reveal the bar first. On macOS 13 and later, the app registers itself to launch at login and checks the resulting status. If approval is needed or registration fails, it shows a setup window linking to Login Items. Keep the app in Applications and open it once after installing. On macOS 12, add it manually in System Preferences → Users & Groups → Login Items. Launch at login starts the app after you sign in, not before login.
 
 ## Accessibility setup
 
@@ -73,13 +73,15 @@ Offline checks, GitHub rate limits, malformed responses, and a repository with n
 
 The app builds locally and passes code-signature verification. Native fixture tests exercise an AppKit menu tracking session, action dispatch, and cancellation. They also check icons, separators, title limits, the initial native menu frame below the menu bar, horizontal centering and edge clamping, explicit icon visibility, click and held-drag opening, held release selection and cancellation, release-version comparisons and error handling, left-button passthrough, empty-list behavior, and menu-bar boundary geometry. A screenshot of the new native menu could not be captured in the development session; its appearance still needs a visual check on the target Mac. Live event interception and restoration still need testing in a logged-in macOS session with Accessibility access for this build, including on a notched MacBook.
 
+The Control-click gesture checks pass, including releasing Control before the mouse button and ignoring releases from the other button. In the latest development run, the full native fixture suite stopped at the menu-position assertion. The unchanged version failed the same assertion, so full UI verification remains incomplete.
+
 Run the fixture tests with `bash Tests/run.sh`. They briefly display a native test menu and dismiss it automatically.
 
 Check these cases when testing a new build:
 
 - Minimize two windows, right-click the menu bar, then click each entry in turn. Only the chosen window should restore and activate.
-- Right-click once and release. The list should stay open until you choose a window, click outside, or press Escape.
-- Hold the right button, slide into the menu, and release over a window. Also check releasing outside the list.
+- Try both right-click and Control-click once and release. The list should stay open until you choose a window, click outside, or press Escape.
+- Hold the right button, slide into the menu, and release over a window. Repeat with Control and the left button, including releasing Control before the mouse button. Also check releasing outside the list.
 - Cancel with Escape and by clicking outside the menu. Neither should restore a window.
 - Test the empty list, ordinary desktop clicks, and right-clicks. Check that left-clicks and drags on app menus and status icons retain their normal behavior and do not open the window list.
 - Check placement beneath the cursor and near both horizontal edges of each display.

@@ -322,7 +322,7 @@ func makeAccessSetupAlert(trusted: Bool) -> NSAlert {
 func makeEnabledAlert() -> NSAlert {
     let alert = NSAlert()
     alert.messageText = "Successfully enabled"
-    alert.informativeText = "Right-click in the middle of the menu bar to see your minimized windows. Click a window in the list to restore it."
+    alert.informativeText = "Right-click or Control-click in the middle of the menu bar to see your minimized windows. Click a window in the list to restore it."
     alert.showsHelp = false
     alert.showsSuppressionButton = false
     alert.addButton(withTitle: "Got it")
