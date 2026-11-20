@@ -1,6 +1,5 @@
 import Foundation
 import CryptoKit
-import FoundationXML
 
 // Verify a packaged release against the public key embedded in the app.
 let feed = try XMLDocument(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))
