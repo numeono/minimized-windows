@@ -11,7 +11,9 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
+ARCH="$(uname -m)"
 swiftc \
+    -target "$ARCH-apple-macosx12.0" \
     "$SCRIPT_DIR/Sources/AppDelegate.swift" \
     "$SCRIPT_DIR/Sources/MenuBarGesture.swift" \
     "$SCRIPT_DIR/Sources/WindowPicker.swift" \
