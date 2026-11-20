@@ -51,7 +51,7 @@ The setup window links to:
 ### Requirements for building
 
 - Xcode Command Line Tools (`xcode-select --install`)
-- No other dependencies
+- The build script downloads Sparkle 2.10.1 and verifies its pinned SHA-256 checksum.
 
 ## Why Accessibility permission?
 
@@ -59,23 +59,31 @@ macOS requires Accessibility access for any app that reads window state from oth
 
 ## How it works
 
-The app uses the macOS Accessibility API (`AXMinimizedWindows` attribute) to query each running application for its minimized windows. It polls lightly in the background (every 2 seconds) to track the order in which windows were minimized. At launch, the app makes one HTTPS request to GitHub to check for a newer stable release. It does not send window titles or other window data.
+The app uses the macOS Accessibility API (`AXMinimizedWindows` attribute) to query each running application for its minimized windows. It polls lightly in the background (every 2 seconds) to track the order in which windows were minimized. The app checks a GitHub-hosted update feed at launch and periodically while running. It does not send window titles or other window data.
 
 ## Updates
 
-At launch, the app checks the latest published, non-draft, non-prerelease GitHub Release and compares its version tag with the installed app version. Use numeric tags such as `v1.12` or `v1.12.1`. Commits on `main` alone do not trigger an update notice.
+Starting with version 1.14, double-click the running app in Applications to check for updates. If an update is available, choose Install Update, then Install and Relaunch when the download is ready. Sparkle downloads the update, verifies its Ed25519 signature, replaces the app, and reopens it. A manual check also reports when you are up to date or when the check fails. Automatic checks run at launch and periodically while the app is open.
 
-If a newer release exists, an Update available window offers View Update and Later. View Update opens that release's GitHub page; it does not download or install an app automatically. The prompt waits until the Accessibility setup, enabled notice, and any open window menu are closed. Later dismisses it for the current launch.
+Version 1.13 and earlier need one final manual replacement to get this updater. Download the latest release, quit the old app, replace it in Applications, and open the new copy. Keep the app in Applications rather than running it from the download archive. macOS may request permission to replace the app or require Accessibility access again after an update.
 
-Offline checks, GitHub rate limits, malformed responses, and a repository with no releases are ignored. The app continues working. To distribute an update, publish a GitHub Release with a newer version tag and attach the built app archive.
+The current download is for Apple silicon Macs. The app is ad-hoc signed and is not Apple-notarized. Update archives have separate Ed25519 signatures that Sparkle verifies before extraction. The private signing key stays in the release machine's Keychain, outside this repository.
+
+### Publishing an update
+
+Increase both `CFBundleShortVersionString` and `CFBundleVersion` in `Sources/Info.plist`. Run `bash scripts/package-release.sh` on the release Mac. It builds the app, verifies its code signature, creates the ZIP, and generates `build/releases/appcast.xml` with a signed download entry. Signing uses the `minimized-windows` Keychain account created by Sparkle's `generate_keys` tool. Do not generate a replacement key for future releases; existing installations trust the public key embedded in the app.
+
+Commit and push the source changes. Publish a stable GitHub Release with a matching version tag and attach the ZIP from `build/releases`. Only after the download is available, copy `build/releases/appcast.xml` to the repository root and commit and push it. The feed must never advertise an archive that is not yet published. Both the GitHub release and this feed are required: version 1.13 uses GitHub's releases API, while version 1.14 and later use Sparkle's feed.
 
 ## Verification
 
-The app builds locally and passes code-signature verification. Native fixture tests exercise an AppKit menu tracking session, action dispatch, and cancellation. They also check icons, separators, title limits, the initial native menu frame below the menu bar, horizontal centering and edge clamping, explicit icon visibility, click and held-drag opening, held release selection and cancellation, release-version comparisons and error handling, left-button passthrough, empty-list behavior, and menu-bar boundary geometry. A screenshot of the new native menu could not be captured in the development session; its appearance still needs a visual check on the target Mac. Live event interception and restoration still need testing in a logged-in macOS session with Accessibility access for this build, including on a notched MacBook.
+The app builds locally and passes code-signature verification. Native fixture tests exercise an AppKit menu tracking session, action dispatch, and cancellation. They also check icons, separators, title limits, the initial native menu frame below the menu bar, horizontal centering and edge clamping, explicit icon visibility, click and held-drag opening, held release selection and cancellation, left-button passthrough, empty-list behavior, and menu-bar boundary geometry. A screenshot of the new native menu could not be captured in the development session; its appearance still needs a visual check on the target Mac. Live event interception and restoration still need testing in a logged-in macOS session with Accessibility access for this build, including on a notched MacBook.
 
 The Control-click gesture checks pass, including releasing Control before the mouse button and ignoring releases from the other button. In the latest development run, the full native fixture suite stopped at the menu-position assertion. The unchanged version failed the same assertion, so full UI verification remains incomplete.
 
-Run the fixture tests with `bash Tests/run.sh`. They briefly display a native test menu and dismiss it automatically.
+The updater integration test uses disposable app bundles and a local HTTP feed. It verifies no-update handling, dismissal, rejection of a tampered archive, and a complete signed download, replacement, and relaunch. Run it on the release Mac with `python3 Tests/Updater/run.py`; it requires the signing key in Keychain and does not touch the installed app.
+
+Run the menu fixture tests with `bash Tests/run.sh`. They briefly display a native test menu and dismiss it automatically.
 
 Check these cases when testing a new build:
 

@@ -9,9 +9,9 @@
     <key>CFBundleDisplayName</key>
     <string>Minimized Windows</string>
     <key>CFBundleVersion</key>
-    <string>14</string>
+    <string>15</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.13</string>
+    <string>1.14</string>
     <key>CFBundleExecutable</key>
     <string>MinimizedWindows</string>
     <key>CFBundlePackageType</key>
@@ -26,5 +26,15 @@
     <string>Required to detect and restore minimized windows and open their menu by right-clicking or Control-clicking the menu bar.</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/numeono/minimized-windows/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>841693rkTRLFwFJoI0cVKJBTF8/8DlrOzLjvwllxVDM=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
 </dict>
 </plist>

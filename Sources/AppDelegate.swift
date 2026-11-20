@@ -1,5 +1,6 @@
 import Cocoa
 import ServiceManagement
+import Sparkle
 
 // MARK: - Minimization timestamps
 
@@ -10,9 +11,8 @@ var minimizeTimestamps: [CGWindowID: Date] = [:]
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingLoginMessage: String?
     private var loginAlert: NSAlert?
-    private var pendingUpdate: ReleaseUpdate?
-    private var updateAlert: NSAlert?
-    private var updateURL: URL?
+    private let updates = SPUStandardUpdaterController(
+        startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
     private var accessAlert: NSAlert?
     private var enabledAlert: NSAlert?
     private let enabledNoticeKey = "hasAcknowledgedMenuBarSetup"
@@ -25,17 +25,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         gesture.onOpen = { [weak self] point in self?.showWindowMenu(at: point) }
         gesture.onHeldRelease = { [weak self] in self?.windowPicker.releaseHeldGesture() }
         updateGestureAvailability()
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-        UpdateChecker.check(currentVersion: version) { [weak self] update in
-            self?.pendingUpdate = update
-            self?.showUpdateIfReady()
+        updates.startUpdater()
+        if updates.updater.automaticallyChecksForUpdates {
+            updates.updater.checkForUpdatesInBackground()
         }
 
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.recordNewlyMinimized()
             self?.updateGestureAvailability()
             self?.showLoginNoticeIfReady()
-            self?.showUpdateIfReady()
         }
         recordNewlyMinimized()
         registerLoginItem()
@@ -64,32 +62,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showUpdateIfReady() {
-        guard let update = pendingUpdate, accessAlert == nil, enabledAlert == nil,
-              windowPicker.menu == nil, updateAlert == nil, loginAlert == nil,
-              pendingLoginMessage == nil else { return }
-        pendingUpdate = nil
-        updateURL = update.url
-        let alert = makeUpdateAlert(version: update.version)
-        alert.buttons[0].target = self
-        alert.buttons[0].action = #selector(viewUpdate)
-        alert.buttons[1].target = self
-        alert.buttons[1].action = #selector(dismissUpdate)
-        updateAlert = alert
-        alert.window.center()
-        NSApp.activate(ignoringOtherApps: true)
-        alert.window.makeKeyAndOrderFront(nil)
-    }
-
-    @objc private func viewUpdate() {
-        if let url = updateURL { NSWorkspace.shared.open(url) }
-        dismissUpdate()
-    }
-
-    @objc private func dismissUpdate() {
-        updateAlert?.window.orderOut(nil)
-        updateAlert = nil
-        updateURL = nil
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Sparkle also brings an existing download/install window back to the front.
+        windowPicker.dismiss()
+        updates.checkForUpdates(nil)
+        return false
     }
 
     private func showEnabledNoticeIfNeeded() {
@@ -201,7 +178,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         guard let message = pendingLoginMessage, loginAlert == nil, accessAlert == nil,
-              enabledAlert == nil, updateAlert == nil, windowPicker.menu == nil else { return }
+              enabledAlert == nil, !updates.updater.sessionInProgress, windowPicker.menu == nil else { return }
         pendingLoginMessage = nil
         let alert = makeLoginAlert(message: message)
         alert.buttons[0].target = self
@@ -326,18 +303,6 @@ func makeEnabledAlert() -> NSAlert {
     alert.showsHelp = false
     alert.showsSuppressionButton = false
     alert.addButton(withTitle: "Got it")
-    alert.layout()
-    return alert
-}
-
-func makeUpdateAlert(version: String) -> NSAlert {
-    let alert = NSAlert()
-    alert.messageText = "Update available"
-    alert.informativeText = "Minimized Windows \(version) is available. Open the GitHub release page to download the update."
-    alert.showsHelp = false
-    alert.showsSuppressionButton = false
-    alert.addButton(withTitle: "View Update")
-    alert.addButton(withTitle: "Later")
     alert.layout()
     return alert
 }
